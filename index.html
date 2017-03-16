@@ -1,0 +1,232 @@
+<html>
+  <head>
+    <style>
+      .three-select{
+        position: absolute;
+        border: 1px solid #eee;
+        color: #4c5a6d;
+        padding: 4px;
+      }
+
+      .three-select .select-option{
+        background: #f7f7f7;
+      }
+
+      .three-select .select-option ul{
+        display: inline-block;
+        list-style: none;
+        padding: 0;
+        margin:0;
+        width: 200px;
+        height: 200px;
+        overflow-y: scroll;
+        overflow-x: hidden;
+        border-right: 1px solid #eee;
+      }
+
+      .three-select .select-option ul:last-child{
+        border-right: none;
+      }
+
+      .three-select .select-option ul li{
+        height: 30px;
+        line-height: 30px;
+        padding: 2px 4px;
+        background: #ebebeb;
+        font-size: 14px;
+        position: relative;
+      }
+
+      /*.three-select .select-option ul li.selected,
+      .three-select .select-option ul li.selected:hover{
+        background: #1c8de0;
+        color: white;
+      }*/
+
+      .three-select .select-option ul li label{
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        left: 0;
+        padding-left: 30px; 
+        cursor: pointer;
+      }
+
+      .three-select .select-option ul li:hover{
+        cursor: pointer;
+        background-color: #f7f7f7;
+        color: orange;
+      }
+
+      .three-select .select-option .level-2 li{
+        background-color: #f7f7f7;
+      }
+
+      .three-select .select-option .level-2 li:hover,
+      .three-select .select-option .level-3 li,
+      .three-select .select-option .level-3 li:hover{
+        background-color: white;
+      }
+
+    </style>
+  </head>
+  <body>
+    <div class="result"></div>
+    <div class="three-select"></div>
+  </body>
+  <script>
+    var $ = function(){
+      return document.querySelector.apply(document, arguments);
+    };
+
+    function ThreeSelect(opt){
+      this.$el = $(opt.selector);
+      this.$data = opt.data || [];
+      this.$selected = opt.selected || [[],[],[]];
+      this.init();
+    }
+
+    ThreeSelect.prototype = {
+      init: function(){
+        this.$el.innerHTML = `
+          <div class="select-option">
+            <ul class="level-1"></ul><ul class="level-2""></ul><ul class="level-3""></ul>
+          </div>
+        `
+        this.$levelList = [];
+        for(var l=1; l<4; l++){
+          let el = $('.level-' + l);
+          this.$levelList.push(el);
+        }
+        this.update(true);
+      },
+      onchange: function(event){
+
+        let option = event.target;
+
+        let value = option.value;
+        let level = option.name && option.name.match(/checkLevel(\d)/)[1];
+
+        if(!value || !level){
+          return ;
+        }
+
+        if(option.checked){
+          this.$selected[level - 1].push(value);
+        }else{
+          this.$selected[level - 1].splice(this.$selected[level - 1].indexOf(value), 1);
+        }
+
+        this.update();
+      },
+      getSelectedList: function(level){
+        let els = document.getElementsByName(`checkLevel${level}`);
+        let result = []
+        for(let i=0; i<els.length; i++){
+          if(els[i].checked){
+            result.push(els[i].value);
+          }
+        }
+        return result;
+      },
+      update: function(first){
+
+        if(!first){
+          this.$selected = [
+            this.getSelectedList(1),
+            this.getSelectedList(2),
+            this.getSelectedList(3),
+          ]
+        }
+
+        var data = [];
+        //第一层渲染;
+        this.render(1, this.$data[0]);
+
+        //第二层渲染;
+        data = [];
+        for(var i = 0; i < this.$selected[0].length; i++){
+          var index = this.$data[0].indexOf(this.$selected[0][i]);
+          data = data.concat(this.$data[1][index]);
+        }
+        this.render(2, data);
+
+        //第三层渲染;
+        data = [];
+        for(var i = 0; i < this.$selected[1].length; i++){
+          for(var j = 0; j < this.$data[1].length; j++){
+            var index = this.$data[1][j].indexOf(this.$selected[1][i]);
+            if(~index){
+              data = data.concat(this.$data[2][j][index]);
+            }
+          }
+        }
+        this.render(3, data);
+
+        $('.result').innerHTML = JSON.stringify(this.$selected);
+      },
+      initCheckbox: function(level, value, index, isSelected){
+        var li = document.createElement('li');
+        var input = document.createElement('input');
+        var label = document.createElement('label');
+        var id = `checkLevel${level}-${index}`;
+        var name = `checkLevel${level}`;
+
+        input.setAttribute('name', name);
+        input.setAttribute('value', value);
+        input.setAttribute('type', 'checkbox');
+        input.setAttribute('id', id);
+        // input.style.display = 'none';
+        label.setAttribute('for', id)
+
+        label.innerHTML = value;
+
+        if(isSelected){
+          input.checked = true;
+          li.className = "selected";
+        }
+
+        input.onchange = this.onchange.bind(this);
+
+        li.appendChild(input);
+        li.appendChild(label);
+
+        return li;
+      },
+      render: function(level, options){
+        var ul = this.$levelList[level - 1];
+        ul.innerHTML = "";
+        var selected = [];
+        for(var i = 0; i < options.length; i++){
+          var isSelected = ~this.$selected[level - 1].indexOf(options[i]);
+          isSelected && selected.push(options[i]);
+          ul.appendChild(this.initCheckbox(
+            level, 
+            options[i], 
+            i,
+            isSelected
+          )); 
+        }
+        this.$selected[level - 1] = selected;
+      }
+    }
+
+    new ThreeSelect({
+      data: [
+        ['水果','动物'],
+        [ 
+          ['香蕉','苹果'],
+          ['马','狗']
+        ],
+        [
+          [['臭香蕉','甜香蕉'],['臭苹果','香苹果']],
+          [['小马','大马','白马'],['小狗','大狗']]
+        ]
+      ],
+      selector: '.three-select',
+      selected: [
+        ['水果'],['苹果'],['臭苹果']
+      ]
+    });
+  </script>
+</html>
